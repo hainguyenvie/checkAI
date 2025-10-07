@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import dotenv from "dotenv";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
@@ -36,7 +36,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Load environment variables early (before importing routes)
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || undefined });
+
 (async () => {
+  const { registerRoutes } = await import("./routes");
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -60,12 +64,33 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  const basePort = parseInt(process.env.PORT || '5000', 10);
+  const maxAttempts = 10;
+  let attempt = 0;
+  let currentPort = basePort;
+
+  const startListening = () => {
+    server.listen({
+      port: currentPort,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      log(`serving on port ${currentPort}`);
+    });
+  };
+
+  server.on('error', (err: any) => {
+    if (err && (err.code === 'EADDRINUSE' || err.code === 'EACCES') && attempt < maxAttempts) {
+      const previousPort = currentPort;
+      attempt += 1;
+      currentPort = basePort + attempt;
+      log(`port ${previousPort} unavailable (${err.code}). Trying ${currentPort}…`);
+      // give a short delay before retrying to avoid tight loop
+      setTimeout(startListening, 100);
+    } else {
+      throw err;
+    }
   });
+
+  startListening();
 })();

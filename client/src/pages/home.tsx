@@ -21,7 +21,7 @@ const adminCards = [
   {
     icon: Settings,
     title: "Quản lý Quy tắc",
-    description: "Định nghĩa logic kiểm tra tự động",
+    description: "Định nghĩa logic Thẩm định tự động",
     href: "/admin/rules",
     color: "text-chart-3",
   },
@@ -37,7 +37,7 @@ const accountantCards = [
   },
   {
     icon: CheckCircle,
-    title: "Kết quả Kiểm tra",
+    title: "Kết quả Thẩm định",
     description: "Xem kết quả thẩm định và báo cáo",
     href: "/results",
     color: "text-chart-5",
@@ -50,7 +50,7 @@ export default function HomePage() {
       <div>
         <h1 className="text-4xl font-bold">Hệ thống Thẩm định Tài chính - Kế toán</h1>
         <p className="text-lg text-muted-foreground mt-3">
-          Tự động hóa quy trình kiểm tra hồ sơ thanh toán, giảm 90% thời gian xử lý
+          Tự động hóa quy trình Thẩm định hồ sơ thanh toán, giảm 90% thời gian xử lý
         </p>
       </div>
 
@@ -69,7 +69,7 @@ export default function HomePage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardDescription>Quy tắc kiểm tra</CardDescription>
+            <CardDescription>Quy tắc Thẩm định</CardDescription>
             <CardTitle className="text-3xl font-mono">5</CardTitle>
           </CardHeader>
         </Card>

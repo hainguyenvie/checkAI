@@ -73,7 +73,7 @@ export function RuleResults({ documentSetId }: RuleResultsProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
-            <CardTitle>Kết quả kiểm tra chi tiết</CardTitle>
+            <CardTitle>Kết quả Thẩm định chi tiết</CardTitle>
             <CardDescription>Kết quả thẩm định cho từng quy tắc</CardDescription>
           </div>
           <Button variant="outline" onClick={handleExport} data-testid="button-export">
@@ -84,7 +84,7 @@ export function RuleResults({ documentSetId }: RuleResultsProps) {
         <CardContent>
           {results.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Chưa có kết quả kiểm tra. Nhấn "Chạy kiểm tra" để bắt đầu.
+              Chưa có kết quả Thẩm định. Nhấn "Chạy Thẩm định" để bắt đầu.
             </p>
           ) : (
             <Accordion type="single" collapsible className="w-full">

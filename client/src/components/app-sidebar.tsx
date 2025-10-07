@@ -18,8 +18,8 @@ const adminItems = [
 ];
 
 const accountantItems = [
-  { title: "Xử lý hồ sơ", url: "/process", icon: Upload },
-  { title: "Kết quả kiểm tra", url: "/results", icon: CheckCircle },
+  { title: "Xây dựng bộ hồ sơ thẩm định", url: "/process", icon: Upload },
+  { title: "Kết quả Thẩm định", url: "/results", icon: CheckCircle },
 ];
 
 export function AppSidebar() {

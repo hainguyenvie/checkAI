@@ -51,6 +51,7 @@ export class MemStorage implements IStorage {
   private rules: Map<string, Rule>;
   private documents: Map<string, Document>;
   private verificationResults: Map<string, VerificationResult>;
+  private histories: Map<string, Array<{ id: string; documentSetId: string; name: string; date: string; status: 'Đạt' | 'Không đạt'; failedCount: number }>>;
 
   constructor() {
     this.templates = new Map();
@@ -58,6 +59,7 @@ export class MemStorage implements IStorage {
     this.rules = new Map();
     this.documents = new Map();
     this.verificationResults = new Map();
+    this.histories = new Map();
   }
 
   // Templates
@@ -219,6 +221,19 @@ export class MemStorage implements IStorage {
     return Array.from(this.verificationResults.values()).filter(
       (result) => result.documentSetId === documentSetId
     );
+  }
+
+  // Histories (in-memory only for demo)
+  async getHistory(documentSetId: string): Promise<Array<{ id: string; documentSetId: string; name: string; date: string; status: 'Đạt' | 'Không đạt'; failedCount: number }>> {
+    return this.histories.get(documentSetId) || [];
+  }
+
+  async addHistory(item: { documentSetId: string; name: string; date: string; status: 'Đạt' | 'Không đạt'; failedCount: number }): Promise<void> {
+    const id = randomUUID();
+    const list = this.histories.get(item.documentSetId) || [];
+    // unshift newest first
+    list.unshift({ id, ...item });
+    this.histories.set(item.documentSetId, list);
   }
 }
 

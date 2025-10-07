@@ -10,9 +10,9 @@ import { Plus } from "lucide-react";
 const ruleTypes = [
   { value: "amount_comparison", label: "Đối chiếu tổng tiền" },
   { value: "supplier_verification", label: "Xác thực nhà cung cấp" },
-  { value: "date_validation", label: "Kiểm tra thời gian" },
+  { value: "date_validation", label: "Thẩm định thời gian" },
   { value: "quantity_comparison", label: "Đối chiếu số lượng" },
-  { value: "calculation_check", label: "Kiểm tra tính toán" },
+  { value: "calculation_check", label: "Thẩm định tính toán" },
 ];
 
 export function RuleBuilder() {
@@ -30,7 +30,7 @@ export function RuleBuilder() {
       <Card>
         <CardHeader>
           <CardTitle>Thông tin quy tắc</CardTitle>
-          <CardDescription>Định nghĩa logic kiểm tra cho bộ hồ sơ</CardDescription>
+          <CardDescription>Định nghĩa logic Thẩm định cho bộ hồ sơ</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -47,7 +47,7 @@ export function RuleBuilder() {
             <Label htmlFor="rule-description">Mô tả</Label>
             <Textarea
               id="rule-description"
-              placeholder="Mô tả chi tiết về quy tắc kiểm tra..."
+              placeholder="Mô tả chi tiết về quy tắc Thẩm định..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               data-testid="input-rule-description"
@@ -73,8 +73,8 @@ export function RuleBuilder() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Điều kiện kiểm tra</CardTitle>
-          <CardDescription>Định nghĩa logic kiểm tra bằng biểu thức hoặc ngôn ngữ tự nhiên</CardDescription>
+          <CardTitle>Điều kiện Thẩm định</CardTitle>
+          <CardDescription>Định nghĩa logic Thẩm định bằng biểu thức hoặc ngôn ngữ tự nhiên</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

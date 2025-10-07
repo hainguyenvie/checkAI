@@ -65,7 +65,7 @@ export async function seedData() {
 
   await storage.createRule({
     documentSetId: documentSet.id,
-    name: "Kiểm tra dòng thời gian",
+    name: "Thẩm định dòng thời gian",
     description: "Xác minh tính hợp lệ của ngày tháng (ngày hóa đơn phải sau ngày giao hàng, ngày giao hàng phải sau ngày đặt hàng)",
     ruleType: "date_validation",
     condition: {}
@@ -81,13 +81,28 @@ export async function seedData() {
 
   await storage.createRule({
     documentSetId: documentSet.id,
-    name: "Kiểm tra tính toán",
+    name: "Thẩm định tính toán",
     description: "Xác thực các phép tính ngay trên một chứng từ (tiền hàng + thuế GTGT = tổng tiền thanh toán)",
     ruleType: "calculation_check",
     condition: {}
   });
 
   console.log("✅ Seeded templates, document set, and rules");
+  // Seed mock history entries for demo (finance/accounting)
+  await storage.addHistory({
+    documentSetId: documentSet.id,
+    name: "Bộ hồ sơ tháng 08/2025 - Công ty Global Tech",
+    date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toLocaleString("vi-VN"),
+    status: 'Đạt',
+    failedCount: 0,
+  });
+  await storage.addHistory({
+    documentSetId: documentSet.id,
+    name: "Bộ hồ sơ tháng 07/2025 - Công ty Global Tech",
+    date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 35).toLocaleString("vi-VN"),
+    status: 'Không đạt',
+    failedCount: 3,
+  });
   
   return {
     invoiceTemplate,

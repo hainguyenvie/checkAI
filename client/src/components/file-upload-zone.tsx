@@ -18,9 +18,10 @@ interface UploadedFile {
 interface FileUploadZoneProps {
   documentSetId: string;
   onUploadComplete?: () => void;
+  onFilesChange?: (files: UploadedFile[]) => void;
 }
 
-export function FileUploadZone({ documentSetId, onUploadComplete }: FileUploadZoneProps) {
+export function FileUploadZone({ documentSetId, onUploadComplete, onFilesChange }: FileUploadZoneProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const { toast } = useToast();
 
@@ -69,7 +70,11 @@ export function FileUploadZone({ documentSetId, onUploadComplete }: FileUploadZo
       size: file.size,
       type: file.type,
     }));
-    setFiles((prev) => [...prev, ...newFiles]);
+    setFiles((prev) => {
+      const next = [...prev, ...newFiles];
+      if (onFilesChange) onFilesChange(next);
+      return next;
+    });
 
     for (const file of acceptedFiles) {
       await uploadMutation.mutateAsync(file);
@@ -91,7 +96,9 @@ export function FileUploadZone({ documentSetId, onUploadComplete }: FileUploadZo
   });
 
   const removeFile = (id: string) => {
-    setFiles(files.filter(f => f.id !== id));
+    const next = files.filter(f => f.id !== id);
+    setFiles(next);
+    if (onFilesChange) onFilesChange(next);
   };
 
   const formatFileSize = (bytes: number) => {

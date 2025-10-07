@@ -10,9 +10,9 @@ import { Badge } from "@/components/ui/badge";
 const ruleTypeLabels: Record<string, string> = {
   amount_comparison: "Đối chiếu tổng tiền",
   supplier_verification: "Xác thực nhà cung cấp",
-  date_validation: "Kiểm tra thời gian",
+  date_validation: "Thẩm định thời gian",
   quantity_comparison: "Đối chiếu số lượng",
-  calculation_check: "Kiểm tra tính toán",
+  calculation_check: "Thẩm định tính toán",
 };
 
 export default function RulesPage() {
@@ -46,7 +46,7 @@ export default function RulesPage() {
         <div>
           <h1 className="text-3xl font-bold">Quản lý Quy tắc</h1>
           <p className="text-muted-foreground mt-2">
-            Định nghĩa logic kiểm tra chéo giữa các chứng từ
+            Định nghĩa logic Thẩm định chéo giữa các chứng từ
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

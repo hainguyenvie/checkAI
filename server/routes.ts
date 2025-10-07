@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer from "multer";
@@ -11,6 +11,10 @@ import { PDFExtract } from "pdf.js-extract";
 import { seedData } from "./seed";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+if (!process.env.OPENAI_API_KEY) {
+  // Throw a clear error early to avoid confusing stack traces later
+  throw new Error("Missing OPENAI_API_KEY. Set it in your environment or .env file.");
+}
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 let isSeeded = false;
@@ -18,6 +22,8 @@ let isSeeded = false;
 const upload = multer({ dest: "uploads/" });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve uploaded files statically so iframes can load originals
+  app.use("/uploads", express.static("uploads"));
   // Seed initial data
   if (!isSeeded) {
     await seedData();
@@ -227,10 +233,78 @@ Return ONLY a JSON object with the field names as keys and extracted values. If 
       const { documentSetId } = req.params;
       
       const rules = await storage.getRulesByDocumentSet(documentSetId);
-      const documents = await storage.getDocumentsBySet(documentSetId);
+      let documents = await storage.getDocumentsBySet(documentSetId);
 
+      // If no documents uploaded yet, generate mock documents for this prototype
       if (documents.length === 0) {
-        return res.status(400).json({ error: "No documents to verify" });
+        const documentSet = await storage.getDocumentSet(documentSetId);
+        if (!documentSet) {
+          return res.status(404).json({ error: "Document set not found" });
+        }
+
+        // Generate consistent mock data so the rules have meaningful outputs
+        for (const templateId of (Array.isArray(documentSet.templateIds) ? documentSet.templateIds : [] as any[])) {
+          const template = await storage.getTemplate(templateId);
+          if (!template) continue;
+
+          let extractedData: any = {};
+          const templateName = (template.name || "").toLowerCase();
+          if (templateName.includes("hóa đơn") || templateName.includes("invoice")) {
+            // Intentionally introduce some mismatches for demo: amount + calculation
+            extractedData = {
+              supplier_name: "Công ty TNHH ABC",
+              invoice_number: "INV-2024-001",
+              invoice_date: "2024-01-15",
+              subtotal: 45000000,
+              tax_amount: 4500000,
+              final_amount: 50000000, // mismatch vs PO (49500000) and calc (45000000+4500000=49500000)
+              quantity: 100,
+            };
+          } else if (templateName.includes("đơn đặt hàng") || templateName.includes("purchase order") || templateName.includes("po")) {
+            extractedData = {
+              supplier_name: "Công ty TNHH ABC",
+              po_number: "PO-2023-888",
+              order_date: "2024-01-10",
+              total_amount: 49500000,
+              quantity: 100,
+            };
+          } else if (templateName.includes("phiếu giao hàng") || templateName.includes("delivery")) {
+            extractedData = {
+              supplier_name: "Công ty TNHH XYZ", // mismatch supplier
+              delivery_number: "DL-2024-015",
+              delivery_date: "2024-01-12",
+              quantity: 98, // mismatch quantity vs invoice 100
+            };
+          } else {
+            // Generic mock: fill required fields with sample values
+            const fields = (template.fields as any[]) || [];
+            for (const f of fields) {
+              switch ((f.fieldType || "text").toString()) {
+                case "number":
+                  extractedData[f.name] = 1;
+                  break;
+                case "date":
+                  extractedData[f.name] = "2024-01-01";
+                  break;
+                default:
+                  extractedData[f.name] = f.label || f.name;
+              }
+            }
+          }
+
+          await storage.createDocument({
+            documentSetId,
+            templateId: template.id,
+            fileName: `mock-${template.id}.pdf`,
+            fileType: ".pdf",
+            fileUrl: "/uploads/mock.pdf",
+            extractedData,
+            verified: "false",
+          });
+        }
+
+        // Re-load documents after seeding mocks
+        documents = await storage.getDocumentsBySet(documentSetId);
       }
 
       const results = [];
@@ -247,6 +321,18 @@ Return ONLY a JSON object with the field names as keys and extracted values. If 
         results.push(verificationResult);
       }
 
+      // Aggregate summary for history entry
+      const failedCount = results.filter((r: any) => r.status === 'failed').length;
+      const status = failedCount === 0 ? 'Đạt' : 'Không đạt';
+      const documentSet = await storage.getDocumentSet(documentSetId);
+      await storage.addHistory({
+        documentSetId,
+        name: documentSet?.name || 'Thẩm định mới nhất',
+        date: new Date().toLocaleString("vi-VN"),
+        status: status as any,
+        failedCount,
+      });
+
       res.json(results);
     } catch (error: any) {
       console.error("Verification error:", error);
@@ -257,6 +343,37 @@ Return ONLY a JSON object with the field names as keys and extracted values. If 
   app.get("/api/verification-results/:documentSetId", async (req, res) => {
     const results = await storage.getVerificationResults(req.params.documentSetId);
     res.json(results);
+  });
+
+  // History API
+  app.get('/api/history/:documentSetId', async (req, res) => {
+    const list = await storage.getHistory(req.params.documentSetId);
+    res.json(list);
+  });
+
+  // Generate rules from prompt (prototype)
+  app.post('/api/rules/generate', async (req, res) => {
+    try {
+      const { prompt, templates } = req.body || {};
+      if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+
+      const sys = "Bạn là trợ lý tạo quy tắc kiểm tra dữ liệu giữa nhiều biểu mẫu. Trả về JSON dạng { rules: [{ name, description, ruleType, fields: [{ templateName, fieldName }], condition }]}";
+      const user = `Prompt: ${prompt}\n\nTemplates:\n${JSON.stringify(templates||[], null, 2)}\n\nYêu cầu: Trả về JSON đúng cấu trúc.`;
+
+      const resp = await openai.chat.completions.create({
+        model: 'gpt-5',
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: user },
+        ],
+        response_format: { type: 'json_object' },
+      });
+      const data = JSON.parse(resp.choices?.[0]?.message?.content || '{"rules":[]}');
+      return res.json(data);
+    } catch (e: any) {
+      console.error('Generate rules error:', e);
+      return res.status(500).json({ error: e.message });
+    }
   });
 
   const httpServer = createServer(app);
