@@ -8,13 +8,14 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/status-badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import type { DocumentSet, Rule, VerificationResult } from "@shared/schema";
 
 export default function ResultsPage() {
   const [documentSetId, setDocumentSetId] = useState<string>("");
   const [selectedHistoryId, setSelectedHistoryId] = useState<string>("");
   const { toast } = useToast();
 
-  const { data: documentSets = [] } = useQuery({
+  const { data: documentSets = [] } = useQuery<DocumentSet[]>({
     queryKey: ["/api/document-sets"],
   });
 
@@ -24,7 +25,7 @@ export default function ResultsPage() {
     }
   }, [documentSets, documentSetId]);
 
-  const { data: verificationResults = [] } = useQuery({
+  const { data: verificationResults = [] } = useQuery<VerificationResult[]>({
     queryKey: ["/api/verification-results", documentSetId],
     queryFn: async () => {
       if (!documentSetId) return [];
@@ -35,7 +36,7 @@ export default function ResultsPage() {
     enabled: !!documentSetId,
   });
 
-  const { data: rules = [] } = useQuery({
+  const { data: rules = [] } = useQuery<Rule[]>({
     queryKey: ["/api/rules", documentSetId],
     queryFn: async () => {
       if (!documentSetId) return [];
@@ -53,7 +54,8 @@ export default function ResultsPage() {
       });
       
       if (!response.ok) {
-        throw new Error("Verification failed");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Verification failed");
       }
       
       return response.json();
@@ -68,7 +70,9 @@ export default function ResultsPage() {
     onError: (error: any) => {
       toast({
         title: "Lỗi kiểm tra",
-        description: error.message,
+        description: error.message === "No documents to verify" 
+          ? "Chưa có hồ sơ nào để kiểm tra. Vui lòng tải lên hồ sơ trước."
+          : error.message,
         variant: "destructive",
       });
     },
