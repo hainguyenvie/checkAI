@@ -1,18 +1,17 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Edit, Trash2 } from "lucide-react";
 import { TemplateForm } from "@/components/template-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-const mockTemplates = [
-  { id: "1", name: "Hóa đơn GTGT", description: "Hóa đơn giá trị gia tăng", fieldCount: 8 },
-  { id: "2", name: "Đơn đặt hàng", description: "Purchase Order (PO)", fieldCount: 6 },
-  { id: "3", name: "Phiếu giao hàng", description: "Delivery Note", fieldCount: 5 },
-];
-
 export default function TemplatesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const { data: templates = [] } = useQuery({
+    queryKey: ["/api/templates"],
+  });
 
   return (
     <div className="space-y-6">
@@ -40,7 +39,7 @@ export default function TemplatesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {mockTemplates.map((template) => (
+        {templates.map((template: any) => (
           <Card key={template.id} className="hover-elevate" data-testid={`card-template-${template.id}`}>
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -58,7 +57,7 @@ export default function TemplatesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  {template.fieldCount} trường
+                  {Array.isArray(template.fields) ? template.fields.length : 0} trường
                 </span>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="icon" data-testid={`button-edit-${template.id}`}>

@@ -1,34 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Settings, Edit, Trash2 } from "lucide-react";
 import { RuleBuilder } from "@/components/rule-builder";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-
-const mockRules = [
-  {
-    id: "1",
-    name: "Đối chiếu tổng tiền",
-    description: "So sánh tổng tiền thanh toán trên Hóa đơn với tổng giá trị trên Đơn đặt hàng",
-    type: "amount_comparison",
-    condition: "invoice.total_amount == purchase_order.total_amount",
-  },
-  {
-    id: "2",
-    name: "Xác thực nhà cung cấp",
-    description: "Đảm bảo tên nhà cung cấp khớp nhau trên các chứng từ",
-    type: "supplier_verification",
-    condition: "invoice.supplier_name == delivery_note.supplier_name",
-  },
-  {
-    id: "3",
-    name: "Kiểm tra dòng thời gian",
-    description: "Xác minh tính hợp lệ của ngày tháng",
-    type: "date_validation",
-    condition: "invoice.date > delivery_note.date AND delivery_note.date > purchase_order.date",
-  },
-];
 
 const ruleTypeLabels: Record<string, string> = {
   amount_comparison: "Đối chiếu tổng tiền",
@@ -40,6 +17,28 @@ const ruleTypeLabels: Record<string, string> = {
 
 export default function RulesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [documentSetId, setDocumentSetId] = useState<string>("");
+
+  const { data: documentSets = [] } = useQuery({
+    queryKey: ["/api/document-sets"],
+  });
+
+  useEffect(() => {
+    if (documentSets.length > 0 && !documentSetId) {
+      setDocumentSetId(documentSets[0].id);
+    }
+  }, [documentSets, documentSetId]);
+
+  const { data: rules = [] } = useQuery({
+    queryKey: ["/api/rules", documentSetId],
+    queryFn: async () => {
+      if (!documentSetId) return [];
+      const response = await fetch(`/api/rules?documentSetId=${documentSetId}`);
+      if (!response.ok) throw new Error("Failed to fetch rules");
+      return response.json();
+    },
+    enabled: !!documentSetId,
+  });
 
   return (
     <div className="space-y-6">
@@ -67,7 +66,7 @@ export default function RulesPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {mockRules.map((rule) => (
+        {rules.map((rule: any) => (
           <Card key={rule.id} className="hover-elevate" data-testid={`card-rule-${rule.id}`}>
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -78,7 +77,7 @@ export default function RulesPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <CardTitle className="text-lg">{rule.name}</CardTitle>
-                      <Badge variant="outline">{ruleTypeLabels[rule.type]}</Badge>
+                      <Badge variant="outline">{ruleTypeLabels[rule.ruleType] || rule.ruleType}</Badge>
                     </div>
                     <CardDescription>{rule.description}</CardDescription>
                   </div>
@@ -95,8 +94,8 @@ export default function RulesPage() {
             </CardHeader>
             <CardContent>
               <div className="bg-muted p-3 rounded-md">
-                <p className="text-sm font-medium mb-1">Điều kiện:</p>
-                <code className="text-xs font-mono">{rule.condition}</code>
+                <p className="text-sm font-medium mb-1">Loại quy tắc:</p>
+                <code className="text-xs font-mono">{rule.ruleType}</code>
               </div>
             </CardContent>
           </Card>

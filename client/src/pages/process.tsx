@@ -1,12 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileUploadZone } from "@/components/file-upload-zone";
 import { VerificationInterface } from "@/components/verification-interface";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowRight, Upload } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 export default function ProcessPage() {
   const [step, setStep] = useState<"upload" | "verify">("upload");
+  const [selectedSetId, setSelectedSetId] = useState<string>("");
+
+  const { data: documentSets = [] } = useQuery({
+    queryKey: ["/api/document-sets"],
+  });
+
+  useEffect(() => {
+    if (documentSets.length > 0 && !selectedSetId) {
+      setSelectedSetId(documentSets[0].id);
+    }
+  }, [documentSets, selectedSetId]);
 
   return (
     <div className="space-y-6">
@@ -19,22 +31,24 @@ export default function ProcessPage() {
 
       {step === "upload" ? (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Chọn bộ hồ sơ</CardTitle>
-              <CardDescription>Chọn loại bộ hồ sơ cần xử lý</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="p-4 border rounded-md bg-primary/5 border-primary/20">
-                <p className="font-medium">Bộ hồ sơ Thanh toán Nhà cung cấp</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Yêu cầu: Hóa đơn GTGT, Đơn đặt hàng, Phiếu giao hàng
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {documentSets.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Chọn bộ hồ sơ</CardTitle>
+                <CardDescription>Chọn loại bộ hồ sơ cần xử lý</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 border rounded-md bg-primary/5 border-primary/20">
+                  <p className="font-medium">{documentSets[0]?.name}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {documentSets[0]?.description}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          <FileUploadZone />
+          <FileUploadZone documentSetId={selectedSetId} onUploadComplete={() => setStep("verify")} />
 
           <div className="flex justify-end">
             <Button onClick={() => setStep("verify")} data-testid="button-next-verify">

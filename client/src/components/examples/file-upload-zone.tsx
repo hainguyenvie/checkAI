@@ -3,7 +3,7 @@ import { FileUploadZone } from '../file-upload-zone';
 export default function FileUploadZoneExample() {
   return (
     <div className="p-6">
-      <FileUploadZone />
+      <FileUploadZone documentSetId="example-set" />
     </div>
   );
 }

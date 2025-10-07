@@ -3,70 +3,45 @@ import { StatusBadge } from "./status-badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
-const mockResults = [
-  {
-    id: "1",
-    ruleName: "Đối chiếu tổng tiền",
-    status: "passed" as const,
-    message: "Tổng tiền hóa đơn khớp với đơn đặt hàng",
-    details: {
-      invoice_amount: "55,000,000 VNĐ",
-      po_amount: "55,000,000 VNĐ",
-      difference: "0 VNĐ",
-    },
-  },
-  {
-    id: "2",
-    ruleName: "Xác thực nhà cung cấp",
-    status: "passed" as const,
-    message: "Tên nhà cung cấp khớp trên tất cả chứng từ",
-    details: {
-      invoice_supplier: "Công ty TNHH ABC",
-      po_supplier: "Công ty TNHH ABC",
-      delivery_supplier: "Công ty TNHH ABC",
-    },
-  },
-  {
-    id: "3",
-    ruleName: "Kiểm tra dòng thời gian",
-    status: "failed" as const,
-    message: "Ngày hóa đơn không hợp lệ - sớm hơn ngày giao hàng",
-    details: {
-      invoice_date: "2024-01-15",
-      delivery_date: "2024-01-18",
-      po_date: "2024-01-10",
-      issue: "Ngày hóa đơn phải sau ngày giao hàng",
-    },
-  },
-  {
-    id: "4",
-    ruleName: "Đối chiếu số lượng",
-    status: "passed" as const,
-    message: "Số lượng hàng hóa khớp giữa các chứng từ",
-    details: {
-      invoice_quantity: "100 sản phẩm",
-      delivery_quantity: "100 sản phẩm",
-      po_quantity: "100 sản phẩm",
-    },
-  },
-  {
-    id: "5",
-    ruleName: "Kiểm tra tính toán",
-    status: "passed" as const,
-    message: "Công thức tính toán chính xác",
-    details: {
-      subtotal: "50,000,000 VNĐ",
-      tax: "5,000,000 VNĐ (10%)",
-      total: "55,000,000 VNĐ",
-      calculation: "50,000,000 + 5,000,000 = 55,000,000 ✓",
-    },
-  },
-];
+interface RuleResultsProps {
+  documentSetId: string;
+}
 
-export function RuleResults() {
-  const passedCount = mockResults.filter(r => r.status === "passed").length;
-  const totalCount = mockResults.length;
+export function RuleResults({ documentSetId }: RuleResultsProps) {
+  const { data: verificationResults = [] } = useQuery({
+    queryKey: ["/api/verification-results", documentSetId],
+    queryFn: async () => {
+      if (!documentSetId) return [];
+      const response = await fetch(`/api/verification-results/${documentSetId}`);
+      if (!response.ok) throw new Error("Failed to fetch results");
+      return response.json();
+    },
+    enabled: !!documentSetId,
+  });
+
+  const { data: rules = [] } = useQuery({
+    queryKey: ["/api/rules", documentSetId],
+    queryFn: async () => {
+      if (!documentSetId) return [];
+      const response = await fetch(`/api/rules?documentSetId=${documentSetId}`);
+      if (!response.ok) throw new Error("Failed to fetch rules");
+      return response.json();
+    },
+    enabled: !!documentSetId,
+  });
+
+  const results = verificationResults.map((vr: any) => {
+    const rule = rules.find((r: any) => r.id === vr.ruleId);
+    return {
+      ...vr,
+      ruleName: rule?.name || "Unknown Rule",
+    };
+  });
+
+  const passedCount = results.filter((r: any) => r.status === "passed").length;
+  const totalCount = results.length;
 
   const handleExport = () => {
     console.log("Exporting report...");
@@ -107,8 +82,13 @@ export function RuleResults() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Accordion type="single" collapsible className="w-full">
-            {mockResults.map((result) => (
+          {results.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              Chưa có kết quả kiểm tra. Nhấn "Chạy kiểm tra" để bắt đầu.
+            </p>
+          ) : (
+            <Accordion type="single" collapsible className="w-full">
+              {results.map((result: any) => (
               <AccordionItem key={result.id} value={result.id}>
                 <AccordionTrigger className="hover:no-underline" data-testid={`accordion-trigger-${result.id}`}>
                   <div className="flex items-center gap-3 flex-1">
@@ -119,20 +99,23 @@ export function RuleResults() {
                 <AccordionContent>
                   <div className="pl-4 pt-2 space-y-3">
                     <p className="text-sm">{result.message}</p>
-                    <div className="bg-muted p-4 rounded-md space-y-2">
-                      <p className="text-sm font-medium">Chi tiết:</p>
-                      {Object.entries(result.details).map(([key, value]) => (
-                        <div key={key} className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{key}:</span>
-                          <span className="font-medium font-mono">{value}</span>
-                        </div>
-                      ))}
-                    </div>
+                    {result.details && (
+                      <div className="bg-muted p-4 rounded-md space-y-2">
+                        <p className="text-sm font-medium">Chi tiết:</p>
+                        {Object.entries(result.details).map(([key, value]) => (
+                          <div key={key} className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{key}:</span>
+                            <span className="font-medium font-mono">{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </AccordionContent>
               </AccordionItem>
-            ))}
-          </Accordion>
+              ))}
+            </Accordion>
+          )}
         </CardContent>
       </Card>
     </div>

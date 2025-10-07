@@ -1,15 +1,58 @@
+import { useState, useEffect } from "react";
 import { RuleResults } from "@/components/rule-results";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Play, History } from "lucide-react";
-
-const mockHistory = [
-  { id: "1", date: "2024-01-20 14:30", set: "Thanh toán NCC - ABC Corp", status: "failed" as const },
-  { id: "2", date: "2024-01-19 10:15", set: "Thanh toán NCC - XYZ Ltd", status: "passed" as const },
-  { id: "3", date: "2024-01-18 16:45", set: "Thanh toán NCC - DEF Inc", status: "passed" as const },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ResultsPage() {
+  const [documentSetId, setDocumentSetId] = useState<string>("");
+  const { toast } = useToast();
+
+  const { data: documentSets = [] } = useQuery({
+    queryKey: ["/api/document-sets"],
+  });
+
+  useEffect(() => {
+    if (documentSets.length > 0 && !documentSetId) {
+      setDocumentSetId(documentSets[0].id);
+    }
+  }, [documentSets, documentSetId]);
+
+  const { data: verificationResults = [] } = useQuery({
+    queryKey: ["/api/verification-results", documentSetId],
+    queryFn: async () => {
+      if (!documentSetId) return [];
+      const response = await fetch(`/api/verification-results/${documentSetId}`);
+      if (!response.ok) throw new Error("Failed to fetch results");
+      return response.json();
+    },
+    enabled: !!documentSetId,
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/verify/${documentSetId}`, {
+        method: "POST",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Kiểm tra hoàn tất",
+        description: "Kết quả thẩm định đã được cập nhật",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-results", documentSetId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Lỗi kiểm tra",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
   return (
     <div className="space-y-6">
       <div>
@@ -19,57 +62,28 @@ export default function ResultsPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Kết quả kiểm tra mới nhất</CardTitle>
-              <CardDescription>Bộ hồ sơ Thanh toán NCC - ABC Corp</CardDescription>
-            </div>
-            <Button data-testid="button-run-check">
-              <Play className="w-4 h-4 mr-2" />
-              Chạy kiểm tra
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
-
-      <RuleResults />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="w-5 h-5" />
-            Lịch sử kiểm tra
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {mockHistory.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between p-3 border rounded-md hover-elevate"
-                data-testid={`history-item-${item.id}`}
-              >
-                <div className="flex-1">
-                  <p className="font-medium">{item.set}</p>
-                  <p className="text-sm text-muted-foreground">{item.date}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm font-medium ${
-                    item.status === "passed" ? "text-chart-2" : "text-destructive"
-                  }`}>
-                    {item.status === "passed" ? "Đạt" : "Không đạt"}
-                  </span>
-                  <Button variant="outline" size="sm" data-testid={`button-view-${item.id}`}>
-                    Xem chi tiết
-                  </Button>
-                </div>
+      {documentSets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Kết quả kiểm tra</CardTitle>
+                <CardDescription>{documentSets[0]?.name}</CardDescription>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <Button 
+                onClick={() => verifyMutation.mutate()} 
+                disabled={verifyMutation.isPending}
+                data-testid="button-run-check"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                {verifyMutation.isPending ? "Đang kiểm tra..." : "Chạy kiểm tra"}
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
+      <RuleResults documentSetId={documentSetId} />
     </div>
   );
 }

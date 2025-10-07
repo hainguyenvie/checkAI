@@ -3,18 +3,66 @@ import { useDropzone } from "react-dropzone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Upload, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface UploadedFile {
   id: string;
   name: string;
   size: number;
   type: string;
+  documentId?: string;
 }
 
-export function FileUploadZone() {
-  const [files, setFiles] = useState<UploadedFile[]>([]);
+interface FileUploadZoneProps {
+  documentSetId: string;
+  onUploadComplete?: () => void;
+}
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+export function FileUploadZone({ documentSetId, onUploadComplete }: FileUploadZoneProps) {
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const { toast } = useToast();
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["/api/templates"],
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("documentSetId", documentSetId);
+      formData.append("templateId", templates[0]?.id || "");
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      return response.json();
+    },
+    onSuccess: (data, file) => {
+      toast({
+        title: "File đã được tải lên",
+        description: `${file.name} đã được trích xuất thành công`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Lỗi tải file",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map((file) => ({
       id: `${Date.now()}-${file.name}`,
       name: file.name,
@@ -22,8 +70,15 @@ export function FileUploadZone() {
       type: file.type,
     }));
     setFiles((prev) => [...prev, ...newFiles]);
-    console.log("Files uploaded:", newFiles);
-  }, []);
+
+    for (const file of acceptedFiles) {
+      await uploadMutation.mutateAsync(file);
+    }
+
+    if (onUploadComplete) {
+      onUploadComplete();
+    }
+  }, [uploadMutation, onUploadComplete]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, LayoutDashboard, Edit, Trash2, FileText } from "lucide-react";
@@ -6,18 +7,16 @@ import { DocumentSetForm } from "@/components/document-set-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
-const mockSets = [
-  {
-    id: "1",
-    name: "Bộ hồ sơ Thanh toán Nhà cung cấp",
-    description: "Bộ hồ sơ hoàn chỉnh cho thanh toán nhà cung cấp",
-    templates: ["Hóa đơn GTGT", "Đơn đặt hàng", "Phiếu giao hàng"],
-    ruleCount: 5,
-  },
-];
-
 export default function DocumentSetsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const { data: documentSets = [] } = useQuery({
+    queryKey: ["/api/document-sets"],
+  });
+  
+  const { data: templates = [] } = useQuery({
+    queryKey: ["/api/templates"],
+  });
 
   return (
     <div className="space-y-6">
@@ -45,7 +44,14 @@ export default function DocumentSetsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {mockSets.map((set) => (
+        {documentSets.map((set: any) => {
+          const setTemplateNames = Array.isArray(set.templateIds) 
+            ? set.templateIds.map((id: string) => 
+                templates.find((t: any) => t.id === id)?.name || "Unknown"
+              ).filter(Boolean)
+            : [];
+          
+          return (
           <Card key={set.id} className="hover-elevate" data-testid={`card-set-${set.id}`}>
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -72,22 +78,18 @@ export default function DocumentSetsPage() {
               <div>
                 <p className="text-sm font-medium mb-2">Biểu mẫu bao gồm:</p>
                 <div className="flex flex-wrap gap-2">
-                  {set.templates.map((template, index) => (
+                  {setTemplateNames.map((templateName: string, index: number) => (
                     <Badge key={index} variant="outline" className="gap-1">
                       <FileText className="w-3 h-3" />
-                      {template}
+                      {templateName}
                     </Badge>
                   ))}
                 </div>
               </div>
-              <div className="flex items-center justify-between pt-2 border-t">
-                <span className="text-sm text-muted-foreground">
-                  {set.ruleCount} quy tắc kiểm tra
-                </span>
-              </div>
             </CardContent>
           </Card>
-        ))}
+        );
+        })}
       </div>
     </div>
   );
