@@ -24,6 +24,8 @@ export default function ProcessPage() {
   const [rules, setRules] = useState<any[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<{ name: string; description: string } | null>(null);
+  const [currentRule, setCurrentRule] = useState<any>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: documentSets = [] } = useQuery({
     queryKey: ["/api/document-sets"],
@@ -44,7 +46,8 @@ export default function ProcessPage() {
     }
   }, [documentSets, selectedSetId]);
 
-  async function handleGenerateRules() {
+  async function handleGenerateRule() {
+    setIsCreating(true);
     try {
       const payload = {
         prompt,
@@ -63,9 +66,8 @@ export default function ProcessPage() {
           { templateName: 'Phiếu giao hàng', fieldName: 'supplier_name' },
         ], condition: { equalsAll: ['supplier_name'] } }
       ]};
-      setGenerated(finalData);
-      setRules(finalData.rules);
-      setEditingIndex(null);
+      setCurrentRule(finalData.rules[0]);
+      setPrompt(""); // Clear prompt after generating
     } catch (e) {
       const fallback = { rules: [
         { name: 'Đối chiếu tổng tiền', description: 'Hóa đơn = PO', ruleType: 'amount_comparison', fields: [
@@ -73,10 +75,29 @@ export default function ProcessPage() {
           { templateName: 'Đơn đặt hàng', fieldName: 'total_amount' },
         ], condition: { equals: ['final_amount','total_amount'] } }
       ]};
-      setGenerated(fallback);
-      setRules(fallback.rules);
-      setEditingIndex(null);
+      setCurrentRule(fallback.rules[0]);
+      setPrompt("");
+    } finally {
+      setIsCreating(false);
     }
+  }
+
+  function saveCurrentRule() {
+    if (currentRule) {
+      setRules(prev => [...prev, currentRule]);
+      setCurrentRule(null);
+      setPrompt("");
+    }
+  }
+
+  function discardCurrentRule() {
+    setCurrentRule(null);
+    setPrompt("");
+  }
+
+  function startNewRule() {
+    setCurrentRule(null);
+    setPrompt("");
   }
 
   function startEditRule(idx: number) {
@@ -108,12 +129,128 @@ export default function ProcessPage() {
 
   function mockValue(field: any, index: number) {
     const n = (field?.name || '').toLowerCase();
-    if (n.includes('supplier')) return 'Công ty TNHH ABC';
-    if (n.includes('invoice_number') || n.includes('po_number') || n.includes('delivery_number')) return 'INV-2024-001';
-    if (n.includes('date')) return '2024-01-15';
-    if (n.includes('total') || n.includes('amount') || n.includes('subtotal') || n.includes('tax')) return 12345678;
-    if (field?.fieldType === 'number') return 100;
-    return field?.label || field?.name || `value-${index}`;
+    const l = (field?.label || '').toLowerCase();
+    
+    // Supplier related
+    if (n.includes('supplier') || l.includes('nhà cung cấp') || l.includes('supplier')) {
+      return 'Công ty TNHH ABC';
+    }
+    
+    // Document numbers
+    if (n.includes('invoice_number') || l.includes('số hóa đơn')) return 'INV-2024-001';
+    if (n.includes('po_number') || l.includes('số po') || l.includes('số đơn đặt hàng')) return 'PO-2024-888';
+    if (n.includes('delivery_number') || l.includes('số phiếu giao') || l.includes('số giao hàng')) return 'DL-2024-015';
+    
+    // Dates
+    if (n.includes('date') || l.includes('ngày')) return '2024-01-15';
+    
+    // Amounts and money
+    if (n.includes('total_amount') || l.includes('tổng tiền') || l.includes('tổng giá trị')) return 49500000;
+    if (n.includes('final_amount') || l.includes('tổng thanh toán') || l.includes('thành tiền')) return 50000000;
+    if (n.includes('subtotal') || l.includes('tạm tính') || l.includes('tiền hàng')) return 45000000;
+    if (n.includes('tax') || l.includes('thuế') || l.includes('vat')) return 4500000;
+    if (n.includes('amount') || l.includes('số tiền')) return 12345678;
+    
+    // Quantities
+    if (n.includes('quantity') || l.includes('số lượng')) return 100;
+    
+    // Address
+    if (n.includes('address') || l.includes('địa chỉ')) return '123 Đường ABC, Quận 1, TP.HCM';
+    
+    // Phone
+    if (n.includes('phone') || l.includes('số điện thoại')) return '0901234567';
+    
+    // Email
+    if (n.includes('email') || l.includes('thư điện tử')) return 'contact@company.com';
+    
+    // Default fallbacks
+    if (field?.fieldType === 'number') return Math.floor(Math.random() * 1000) + 1;
+    if (field?.fieldType === 'date') return '2024-01-15';
+    if (field?.fieldType === 'email') return 'user@example.com';
+    
+    return field?.label || field?.name || `Mock ${index + 1}`;
+  }
+
+  // Enhanced mock data for better visualization
+  function getEnhancedMockData(templateId: string, fieldName: string) {
+    const template = (templates as any[]).find(t => t.id === templateId);
+    const templateName = (template?.name || '').toLowerCase();
+    
+    // Invoice specific data
+    if (templateName.includes('hóa đơn') || templateName.includes('invoice')) {
+      const mockInvoice = {
+        supplier_name: 'Công ty TNHH ABC',
+        supplier_address: '123 Đường ABC, Quận 1, TP.HCM',
+        supplier_phone: '0901234567',
+        supplier_email: 'contact@abc.com',
+        customer_name: 'Công ty XYZ',
+        customer_address: '456 Đường XYZ, Quận 3, TP.HCM',
+        invoice_number: 'INV-2024-001',
+        invoice_date: '2024-01-15',
+        due_date: '2024-02-15',
+        subtotal: 45000000,
+        tax_rate: 10,
+        tax_amount: 4500000,
+        discount: 0,
+        final_amount: 49500000,
+        currency: 'VND',
+        payment_method: 'Chuyển khoản',
+        quantity: 100,
+        unit_price: 450000,
+        description: 'Dịch vụ tư vấn kế toán',
+        notes: 'Thanh toán trong 30 ngày',
+      };
+      return mockInvoice[fieldName] || 'N/A';
+    }
+    
+    // Purchase Order specific data
+    if (templateName.includes('đơn đặt hàng') || templateName.includes('purchase order') || templateName.includes('po')) {
+      const mockPO = {
+        supplier_name: 'Công ty TNHH ABC',
+        supplier_address: '123 Đường ABC, Quận 1, TP.HCM',
+        supplier_phone: '0901234567',
+        buyer_name: 'Công ty XYZ',
+        buyer_address: '456 Đường XYZ, Quận 3, TP.HCM',
+        po_number: 'PO-2024-888',
+        order_date: '2024-01-10',
+        delivery_date: '2024-01-20',
+        total_amount: 49500000,
+        currency: 'VND',
+        quantity: 100,
+        unit_price: 495000,
+        description: 'Đơn đặt hàng dịch vụ tư vấn',
+        terms: 'Giao hàng trong 10 ngày',
+        authorized_by: 'Nguyễn Văn A',
+        approved_by: 'Trần Thị B',
+      };
+      return mockPO[fieldName] || 'N/A';
+    }
+    
+    // Delivery Note specific data
+    if (templateName.includes('phiếu giao hàng') || templateName.includes('delivery')) {
+      const mockDelivery = {
+        supplier_name: 'Công ty TNHH ABC',
+        supplier_address: '123 Đường ABC, Quận 1, TP.HCM',
+        customer_name: 'Công ty XYZ',
+        customer_address: '456 Đường XYZ, Quận 3, TP.HCM',
+        delivery_number: 'DL-2024-015',
+        delivery_date: '2024-01-12',
+        po_number: 'PO-2024-888',
+        invoice_number: 'INV-2024-001',
+        quantity: 98,
+        unit_price: 495000,
+        total_value: 48510000,
+        driver_name: 'Lê Văn C',
+        driver_phone: '0907654321',
+        vehicle_number: '51A-12345',
+        delivery_address: '456 Đường XYZ, Quận 3, TP.HCM',
+        received_by: 'Phạm Thị D',
+        notes: 'Giao hàng đúng hạn, khách hàng hài lòng',
+      };
+      return mockDelivery[fieldName] || 'N/A';
+    }
+    
+    return 'N/A';
   }
 
   return (
@@ -331,7 +468,24 @@ export default function ProcessPage() {
               {/* prompt input */}
               <textarea className="w-full h-32 p-3 rounded-md border font-mono text-sm text-black" placeholder="Ví dụ: Trường Tổng kinh phí trong biểu mẫu A phải bằng tổng của các trường Chi phí nhân sự + Chi phí thiết bị trong biểu mẫu B." id="prompt-input" value={prompt} onChange={(e)=> setPrompt(e.target.value)} />
               <div className="flex justify-end gap-2">
-                <Button onClick={handleGenerateRules}>Generate quy tắc</Button>
+                <Button onClick={handleGenerateRule} disabled={!prompt.trim() || isCreating}>
+                  {isCreating ? "Đang tạo..." : "Generate quy tắc"}
+                </Button>
+                {currentRule && (
+                  <>
+                    <Button onClick={saveCurrentRule} variant="default">
+                      Lưu quy tắc
+                    </Button>
+                    <Button onClick={discardCurrentRule} variant="outline">
+                      Xóa và tạo mới
+                    </Button>
+                  </>
+                )}
+                {!currentRule && rules.length > 0 && (
+                  <Button onClick={startNewRule} variant="outline">
+                    Tạo quy tắc mới
+                  </Button>
+                )}
               </div>
 
               {/* suggestions from templates */}
@@ -344,11 +498,82 @@ export default function ProcessPage() {
                 </div>
               </div>
 
-              {/* visualization */}
+              {/* Current rule preview */}
+              {currentRule && (
+                <div className="p-4 rounded-md border bg-blue-50 border-blue-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h4 className="font-medium text-blue-900">Quy tắc đang tạo</h4>
+                      <p className="text-sm text-blue-700">{currentRule.name || 'Rule mới'}</p>
+                      {currentRule.description && (
+                        <p className="text-xs text-blue-600 mt-1">{currentRule.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={saveCurrentRule}>Lưu quy tắc</Button>
+                      <Button size="sm" variant="outline" onClick={discardCurrentRule}>Xóa</Button>
+                    </div>
+                  </div>
+                  
+                  {/* Field chips */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(currentRule.fields||[]).map((f:any, i:number)=> (
+                      <span key={i} className="text-xs font-mono px-2 py-1 rounded-full bg-blue-100 text-blue-800 border border-blue-300">
+                        {`${f.templateName}.${f.fieldName}`}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Enhanced visualization with better mock data */}
+                  {(() => {
+                    const ValueCell = ({ label, value, highlight=false }: any) => (
+                      <div className={`p-2 rounded-md border ${highlight ? 'bg-chart-2/20 border-chart-2 ring-2 ring-chart-2/60' : 'bg-white'}`}>
+                        <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
+                        <p className="font-mono text-xs break-all text-gray-900">{String(value ?? '-')}</p>
+                      </div>
+                    );
+
+                    const sel = getSelectedTemplates();
+                    const cols = sel.map((t:any) => {
+                      const doc = findDocForTemplate(t.id);
+                      const data = doc?.extractedData || {};
+                      return { t, doc, data };
+                    });
+                    const hl = (t:any, field:any) => (currentRule.fields||[]).some((f:any)=> (f.templateName||'').toLowerCase().includes((t.name||'').toLowerCase()) && (f.fieldName||'')===field.name);
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {cols.map(({t, doc, data}: any, cidx: number) => (
+                          <div key={t.id} className="bg-white rounded-md border p-3">
+                            <p className="font-medium mb-3 text-gray-900">{t.name}</p>
+                            <div className="space-y-2">
+                              {(Array.isArray(t.fields)? t.fields : []).map((f:any, findex:number)=> {
+                                const enhancedValue = getEnhancedMockData(t.id, f.name);
+                                const displayValue = data[f.name] ?? enhancedValue;
+                                return (
+                                  <ValueCell 
+                                    key={`${t.id}-${f.name}`} 
+                                    label={f.label} 
+                                    value={displayValue} 
+                                    highlight={hl(t, f)} 
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Saved rules */}
               {rules && rules.length > 0 && (
                 <div className="space-y-3">
+                  <h4 className="font-medium text-gray-900">Quy tắc đã lưu ({rules.length})</h4>
                   {rules.map((r:any, idx:number)=> (
-                    <div key={idx} className="p-3 rounded-md border">
+                    <div key={idx} className="p-3 rounded-md border bg-gray-50">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           {editingIndex === idx ? (
@@ -376,43 +601,9 @@ export default function ProcessPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 mb-3">
                         {(r.fields||[]).map((f:any, i:number)=> (
-                          <span key={i} className="text-xs font-mono px-2 py-0.5 rounded-full border">{`${f.templateName}.${f.fieldName}`}</span>
+                          <span key={i} className="text-xs font-mono px-2 py-0.5 rounded-full border bg-gray-200">{`${f.templateName}.${f.fieldName}`}</span>
                         ))}
                       </div>
-
-                      {/* Document comparison visualization */}
-                      {(() => {
-                        const ValueCell = ({ label, value, highlight=false }: any) => (
-                          <div className={`p-2 rounded-md border ${highlight ? 'bg-chart-2/10 border-chart-2 ring-1 ring-chart-2/50' : 'bg-muted/40'}`}>
-                            <p className="text-[11px] text-muted-foreground">{label}</p>
-                            <p className="font-mono text-xs break-all">{String(value ?? '-')}</p>
-                          </div>
-                        );
-
-                        // dynamic columns using selected templates (same as step 2)
-                        const sel = getSelectedTemplates();
-                        const cols = sel.map((t:any) => {
-                          const doc = findDocForTemplate(t.id);
-                          const data = doc?.extractedData || {};
-                          return { t, doc, data };
-                        });
-                        const hl = (t:any, field:any) => (r.fields||[]).some((f:any)=> (f.templateName||'').toLowerCase().includes((t.name||'').toLowerCase()) && (f.fieldName||'')===field.name);
-
-                        return (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {cols.map(({t, doc, data}: any, cidx: number) => (
-                              <div key={t.id}>
-                                <p className="font-medium mb-2">{t.name}</p>
-                                <div className="space-y-2">
-                                  {(Array.isArray(t.fields)? t.fields : []).map((f:any, findex:number)=> (
-                                    <ValueCell key={`${t.id}-${f.name}`} label={`${f.label}`} value={(data[f.name] ?? mockValue(f, findex))} highlight={hl(t, f)} />
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
                     </div>
                   ))}
                 </div>
